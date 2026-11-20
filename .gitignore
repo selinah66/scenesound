@@ -221,3 +221,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Credentials
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Uploaded and generated media
+uploads/
+outputs/
+tmp/
+
+# Local files
+.DS_Store
+*.log
