@@ -1,0 +1,13 @@
+id,audio_type,description
+a01,Ambience,"A rainy city alley at night with steady rain, distant traffic, and dripping water."
+a02,Ambience,"A quiet forest with wind moving through trees, rustling leaves, and scattered birds."
+a03,Ambience,"An empty warehouse with low ventilation hum and a hollow indoor atmosphere."
+a04,Ambience,"A beach with gentle ocean waves and a light coastal breeze."
+s01,Sound effect,"A heavy metal warehouse door slams shut with a long indoor echo."
+s02,Sound effect,"Slow footsteps on wet pavement in a city alley."
+s03,Sound effect,"A car passes on a rainy road, with tires splashing through water."
+s04,Sound effect,"Dry leaves crunch under footsteps on a forest path."
+m01,Instrumental music,"An uneasy city night scene with low sustained strings and sparse piano."
+m02,Instrumental music,"A calm forest scene with soft acoustic guitar and sustained warm pads."
+m03,Instrumental music,"A lonely rainy street scene with slow piano and restrained strings."
+m04,Instrumental music,"A joyful sunny beach scene with light percussion and bright guitar."
