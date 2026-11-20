@@ -14,13 +14,13 @@ st.caption("Local prompt-drafting starter. Audio generation is not connected yet
 video = st.file_uploader("Optional: preview an MP4 clip", type=["mp4"])
 if video is not None:
     st.video(video)
-st.caption("The written description drives retrieval; this starter does not analyze video.")
+st.caption("The written description drives retrieval and this starter does not analyze video yet.")
 
 scene = st.text_area(
     "Describe the setting and sounds you want",
     value="A rainy city alley at night with distant traffic.",
 )
-mood = st.selectbox("Choose a mood", ["Tense", "Calm", "Melancholic", "Joyful"])
+mood = st.selectbox("Choose a mood", ["Tense", "Calm", "Melancholic", "Joyful", "Urgent"])
 audio_type = st.selectbox(
     "What are you creating?", ["Ambience", "Sound effect", "Instrumental music"]
 )
@@ -78,7 +78,7 @@ if st.button("2. Build editable prompt"):
         st.error(str(error))
 
 if "prompt_draft" in st.session_state:
-    prompt = st.text_area("3. Review and edit your prompt", key="prompt_draft", height=220)
+    prompt = st.text_area("3. Review and edit your prompt before submitting", key="prompt_draft", height=220)
     st.download_button(
         "Download prompt", data=prompt, file_name="scenesound_prompt.txt", mime="text/plain"
     )
