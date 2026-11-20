@@ -16,8 +16,7 @@ def preprocess_text(text: str) -> str:
     """Normalize a retrieval copy, while leaving the original prompt untouched.
 
     Adapted from Class 2 section 2.2 and Class 3 section 3.1.2.
-    Keep digits, apostrophes, and stop words for scene descriptions. This
-    preserves useful text but does not implement semantic negation handling.
+    Keep digits, apostrophes, and stop words for scene descriptions.
     """
     text = text.lower().replace("’", "'")
     # Replace punctuation with spaces so adjacent words are not joined together.
@@ -54,8 +53,7 @@ def retrieve_examples(
         return []
 
     # Class 2 section 2.4 / Class 3 section 3.1: fit_transform text with TF-IDF.
-    # SceneSound additions: consistent preprocessor, word pairs, audio-type
-    # filtering, query transformation, and cosine-similarity ranking.
+    # SceneSound additions: consistent preprocessor, word pairs, audio-type filtering, query transformation, and cosine-similarity ranking.
     vectorizer = TfidfVectorizer(
         preprocessor=preprocess_text,
         lowercase=False,  # preprocess_text already handles lowercasing.

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from scenesound.nlp import load_sound_descriptions, retrieve_examples
-from scenesound.prompts import build_prompt
+from mvp.nlp import load_sound_descriptions, retrieve_examples
+from mvp.prompts import build_prompt
 
 st.set_page_config(page_title="SceneSound starter", page_icon="🎬", layout="centered")
 st.title("SceneSound")
@@ -63,7 +63,7 @@ if "matches" in st.session_state:
             on_change=lambda: st.session_state.pop("prompt_draft", None),
         )
         chosen = [lookup[sound_id] for sound_id in ids]
-        st.caption("Similarity is vocabulary overlap, not confidence. Check exclusions yourself.")
+        st.caption("Similarity is based on vocabulary overlap, not confidence.")
     else:
         st.info("No matching references found. You can still draft from your description.")
 
