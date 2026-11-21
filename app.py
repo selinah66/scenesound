@@ -82,5 +82,36 @@ if "prompt_draft" in st.session_state:
     st.download_button(
         "Download prompt", data=prompt, file_name="scenesound_prompt.txt", mime="text/plain"
     )
-    # TEAM TASK: add an explicit Generate audio button using the edited prompt.
-    # TEAM TASK: retrieve the finished audio, then create a preview with FFmpeg.
+
+# Member 3 work here
+
+# Temporary test button — does not call Stable Audio.
+    if st.button("Load test audio"):
+        audio_path = Path(__file__).resolve().parent / "data" / "test_audio.mp3"
+
+        try:
+            st.session_state["audio_result"] = {
+                "data": audio_path.read_bytes(),
+                "filename": "scenesound_test.mp3",
+                "mime": "audio/mpeg",
+            }
+        except FileNotFoundError:
+            st.error("Please add an MP3 file at data/test_audio.mp3.")
+
+    # Display saved audio on every rerun.
+    if "audio_result" in st.session_state:
+        result = st.session_state["audio_result"]
+
+        st.audio(
+            result["data"],
+            format=result["mime"],
+        )
+
+        st.download_button(
+            "Download audio",
+            data=result["data"],
+            file_name=result["filename"],
+            mime=result["mime"],
+        )
+
+    # Member #5/6: retrieve the finished audio, then create a preview with FFmpeg.
