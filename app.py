@@ -7,9 +7,14 @@ import streamlit as st
 from mvp.nlp import load_sound_descriptions, retrieve_examples
 from mvp.prompts import build_prompt
 
+from mvp.audio import (
+    StableAudioError,
+    start_audio_generation,
+    fetch_audio_result,)
+
 st.set_page_config(page_title="SceneSound starter", page_icon="🎬", layout="centered")
 st.title("SceneSound")
-st.caption("Local prompt-drafting starter. Audio generation is not connected yet.")
+st.caption("Draft scene-based audio prompts, then generate and download soundtracks using Stable Audio.")
 
 video = st.file_uploader("Optional: preview an MP4 clip", type=["mp4"])
 if video is not None:
@@ -29,7 +34,7 @@ duration = st.slider("Requested audio length (seconds)", 5, 20, 10)
 # Avoid displaying a previous scene's results as if they match new inputs.
 signature = (scene, mood, audio_type, duration)
 if st.session_state.get("input_signature") != signature:
-    for key in ("matches", "chosen_ids", "prompt_draft"):
+    for key in ("matches", "chosen_ids", "prompt_draft", "stable_audio_generation_id", "audio_result"):
         st.session_state.pop(key, None)
     st.session_state["input_signature"] = signature
 
@@ -69,6 +74,8 @@ if "matches" in st.session_state:
 
 if st.button("2. Build editable prompt"):
     try:
+        st.session_state.pop("stable_audio_generation_id", None)
+        st.session_state.pop("audio_result", None)
         st.session_state["prompt_draft"] = build_prompt(
             scene, mood, audio_type, duration, chosen
         )
@@ -84,6 +91,47 @@ if "prompt_draft" in st.session_state:
     )
 
 # Member 3 work here
+
+    # member 3: submit one audio generation only when clicked
+    if st.button("4. Generate audio with Stable Audio"):
+        try:
+            api_key = st.secrets["STABILITY_API_KEY"]
+            generation_id = start_audio_generation(
+                prompt=st.session_state["prompt_draft"],
+                duration=duration,
+                api_key=api_key,
+            )
+            st.session_state["stable_audio_generation_id"] = generation_id
+            st.session_state.pop("audio_result", None)
+            st.success("Audio generation submitted. Use Check status to retrieve it.")
+        except KeyError:
+            st.error("STABILITY_API_KEY is missing from Streamlit secrets.")
+        except (StableAudioError, ValueError) as error:
+            st.error(str(error))
+
+    # member 3: check an existing job without generating another
+    if "stable_audio_generation_id" in st.session_state:
+        st.caption("Generation submitted. Checking status does not use generation credits.")
+        if st.button("Check Stable Audio status"):
+            try:
+                api_key = st.secrets["STABILITY_API_KEY"]
+                audio_bytes = fetch_audio_result(
+                    st.session_state["stable_audio_generation_id"],
+                    api_key,)
+
+                if audio_bytes is None:
+                    st.info("Audio is still generating. Check again later.")
+                else:
+                    st.session_state["audio_result"] = {
+                        "data": audio_bytes,
+                        "filename": "scenesound_generated.mp3",
+                        "mime": "audio/mpeg",}
+
+                    st.success("Your generated audio is ready.")
+            except KeyError:
+                st.error("STABILITY_API_KEY is missing from Streamlit secrets.")
+            except (StableAudioError, ValueError) as error:
+                st.error(str(error))
 
 # Temporary test button — does not call Stable Audio.
     if st.button("Load test audio"):
@@ -104,14 +152,12 @@ if "prompt_draft" in st.session_state:
 
         st.audio(
             result["data"],
-            format=result["mime"],
-        )
+            format=result["mime"],)
 
         st.download_button(
             "Download audio",
             data=result["data"],
             file_name=result["filename"],
-            mime=result["mime"],
-        )
+            mime=result["mime"],)
 
     # Member #5/6: retrieve the finished audio, then create a preview with FFmpeg.
