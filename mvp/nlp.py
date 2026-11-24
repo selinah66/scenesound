@@ -48,6 +48,8 @@ def load_sound_descriptions(path: str | Path) -> list[dict]:
         raise ValueError(
             "Audio types must be Ambience, Sound effect, or Instrumental music."
         )
+    if len({row["id"] for row in records}) != len(records):
+        raise ValueError("Each sound description needs a unique id.")
     return records
 
 

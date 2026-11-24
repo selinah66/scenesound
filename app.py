@@ -116,6 +116,7 @@ if "prompt_draft" in st.session_state:
 # Outside prompt condition, a job can still be checked after the user changes the scene or clears/rebuilds the prompt.
 if "stable_audio_generation_id" in st.session_state:
     st.info("An audio request is pending. Check it before submitting another.")
+
     if st.button("Check Stable Audio status"):
         try:
             api_key = st.secrets["STABILITY_API_KEY"]
@@ -142,6 +143,18 @@ if "stable_audio_generation_id" in st.session_state:
         except (StableAudioError, ValueError) as error:
             # Keep both the job ID and the last completed audio on an error.
             st.error(str(error))
+
+    with st.expander("Trouble retrieving this request?"):
+        st.warning(
+            "If this request is no longer retrievable, you can forget it. "
+            "This does not cancel generation on Stability's servers. "
+            "A new generation may use additional credits."
+        )
+
+        if st.button("Forget pending request"):
+            st.session_state.pop("stable_audio_generation_id", None)
+            st.session_state.pop("audio_request", None)
+            st.rerun()
 
 # Member 4: this player remains visible even when no prompt draft is present.
 if "audio_result" in st.session_state:
