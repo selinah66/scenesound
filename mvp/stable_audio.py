@@ -1,4 +1,4 @@
-"""Send a prompt to Stable Audio, wait for it to finish, and return the audio."""
+"""Legacy implementation. The current app uses mvp/audio.py."""
 
 import time
 

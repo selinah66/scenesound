@@ -134,8 +134,13 @@ def fetch_audio_result(generation_id, api_key, *, timeout=REQUEST_TIMEOUT):
     if response.status_code != 200:
         _raise_api_error(response)
 
-    # do not pass json errors or empty responses to an audio player
-    content_type = response.headers.get("Content-Type", "").split(";")[0].lower()
+    # Do not pass json errors or empty responses to an audio player
+    content_type = (
+        response.headers.get("Content-Type", "")
+        .split(";")[0]
+        .strip()
+        .lower()
+    )
     if not content_type.startswith("audio/") or not response.content:
         raise StableAudioError("API returned an empty or unexpected audio result.")
     return response.content

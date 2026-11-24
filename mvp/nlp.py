@@ -1,7 +1,6 @@
 """Local retrieval adapted from Class 2 / Class 3 text-feature demos.
 
 See docs/class_code_reference.md for exact notebook sections and adaptations.
-The ranking and application integration are SceneSound additions.
 """
 
 import csv
@@ -26,16 +25,29 @@ def preprocess_text(text: str) -> str:
 
 def load_sound_descriptions(path: str | Path) -> list[dict]:
     """Read the team's small collection of text descriptions."""
-    with open(path, newline="", encoding="utf-8") as file:
+    with open(path, newline="", encoding="utf-8-sig") as file:
         reader = csv.DictReader(file)
         required = {"id", "audio_type", "description"}
         if not required.issubset(reader.fieldnames or []):
             raise ValueError("CSV needs id, audio_type, and description columns.")
-        records = list(reader)
+        records = [
+            {
+                "id": (row.get("id") or "").strip(),
+                "audio_type": (row.get("audio_type") or "").strip(),
+                "description": (row.get("description") or "").strip(),
+            }
+            for row in reader
+        ]
     if not records or any(not row["description"].strip() for row in records):
         raise ValueError("Provide at least one record and no empty descriptions.")
-    if len({row["id"] for row in records}) != len(records):
-        raise ValueError("Each sound description needs a unique id.")
+    if any(not row["id"] for row in records):
+        raise ValueError("Each sound description needs a nonempty id.")
+
+    valid_types = {"Ambience", "Sound effect", "Instrumental music"}
+    if any(row["audio_type"] not in valid_types for row in records):
+        raise ValueError(
+            "Audio types must be Ambience, Sound effect, or Instrumental music."
+        )
     return records
 
 

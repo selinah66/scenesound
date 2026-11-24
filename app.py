@@ -1,12 +1,9 @@
-"""Run from this folder with: python -m streamlit run app.py"""
-
-from pathlib import Path
+"""Run using: python -m streamlit run app.py"""
 
 import streamlit as st
-
+from pathlib import Path
 from mvp.nlp import load_sound_descriptions, retrieve_examples
 from mvp.prompts import build_prompt
-
 from mvp.audio import (
     StableAudioError,
     start_audio_generation,
@@ -31,10 +28,10 @@ audio_type = st.selectbox(
 )
 duration = st.slider("Requested audio length (seconds)", 5, 20, 10)
 
-# Avoid displaying a previous scene's results as if they match new inputs.
+# Reset retrieval and prompt inputs.
 signature = (scene, mood, audio_type, duration)
 if st.session_state.get("input_signature") != signature:
-    for key in ("matches", "chosen_ids", "prompt_draft", "stable_audio_generation_id", "audio_result"):
+    for key in ("matches", "chosen_ids", "prompt_draft"):
         st.session_state.pop(key, None)
     st.session_state["input_signature"] = signature
 
@@ -74,90 +71,128 @@ if "matches" in st.session_state:
 
 if st.button("2. Build editable prompt"):
     try:
-        st.session_state.pop("stable_audio_generation_id", None)
-        st.session_state.pop("audio_result", None)
         st.session_state["prompt_draft"] = build_prompt(
             scene, mood, audio_type, duration, chosen
         )
-        # TEAM TASK: optionally call the frontier LLM here to refine the local draft.
-        # Keep the original scene constraints and require user review of the result.
     except ValueError as error:
         st.error(str(error))
 
 if "prompt_draft" in st.session_state:
-    prompt = st.text_area("3. Review and edit your prompt before submitting", key="prompt_draft", height=220)
+    prompt = st.text_area(
+        "3. Review and edit your prompt before submitting",
+        key="prompt_draft",
+        height=220,
+    )
     st.download_button(
-        "Download prompt", data=prompt, file_name="scenesound_prompt.txt", mime="text/plain"
+        "Download prompt", data=prompt,
+        file_name="scenesound_prompt.txt", mime="text/plain",
     )
 
-# Member 3 work here
-
-    # member 3: submit one audio generation only when clicked
-    if st.button("4. Generate audio with Stable Audio"):
+    # Member 3 & 4: preserve the existing job until it has been retrieved.
+    pending = "stable_audio_generation_id" in st.session_state
+    if st.button(
+        "4. Generate audio with Stable Audio",
+        disabled=pending or not prompt.strip(),
+    ):
         try:
             api_key = st.secrets["STABILITY_API_KEY"]
             generation_id = start_audio_generation(
-                prompt=st.session_state["prompt_draft"],
-                duration=duration,
-                api_key=api_key,
+                prompt=prompt, duration=duration, api_key=api_key,
             )
             st.session_state["stable_audio_generation_id"] = generation_id
-            st.session_state.pop("audio_result", None)
+            # Save what was actually submitted, not what inputs say later.
+            st.session_state["audio_request"] = {
+                "prompt": prompt,
+                "duration": duration,
+                "signature": signature,
+            }
+            # Keep the previous completed audio while this request runs.
             st.success("Audio generation submitted. Use Check status to retrieve it.")
-        except KeyError:
-            st.error("STABILITY_API_KEY is missing from Streamlit secrets.")
+        except (FileNotFoundError, KeyError):
+            st.error("Add STABILITY_API_KEY to .streamlit/secrets.toml.")
         except (StableAudioError, ValueError) as error:
             st.error(str(error))
 
-    # member 3: check an existing job without generating another
-    if "stable_audio_generation_id" in st.session_state:
-        st.caption("Generation submitted. Checking status does not use generation credits.")
-        if st.button("Check Stable Audio status"):
-            try:
-                api_key = st.secrets["STABILITY_API_KEY"]
-                audio_bytes = fetch_audio_result(
-                    st.session_state["stable_audio_generation_id"],
-                    api_key,)
-
-                if audio_bytes is None:
-                    st.info("Audio is still generating. Check again later.")
-                else:
-                    st.session_state["audio_result"] = {
-                        "data": audio_bytes,
-                        "filename": "scenesound_generated.mp3",
-                        "mime": "audio/mpeg",}
-
-                    st.success("Your generated audio is ready.")
-            except KeyError:
-                st.error("STABILITY_API_KEY is missing from Streamlit secrets.")
-            except (StableAudioError, ValueError) as error:
-                st.error(str(error))
-
-# Temporary test button — does not call Stable Audio.
-    if st.button("Load test audio"):
-        audio_path = Path(__file__).resolve().parent / "data" / "test_audio.mp3"
-
+# Outside prompt condition, a job can still be checked after the user changes the scene or clears/rebuilds the prompt.
+if "stable_audio_generation_id" in st.session_state:
+    st.info("An audio request is pending. Check it before submitting another.")
+    if st.button("Check Stable Audio status"):
         try:
-            st.session_state["audio_result"] = {
-                "data": audio_path.read_bytes(),
-                "filename": "scenesound_test.mp3",
-                "mime": "audio/mpeg",
-            }
-        except FileNotFoundError:
-            st.error("Please add an MP3 file at data/test_audio.mp3.")
+            api_key = st.secrets["STABILITY_API_KEY"]
+            job_id = st.session_state["stable_audio_generation_id"]
+            audio_bytes = fetch_audio_result(job_id, api_key)
 
-    # Display saved audio on every rerun.
-    if "audio_result" in st.session_state:
-        result = st.session_state["audio_result"]
+            if audio_bytes is None:
+                st.info("Audio is still generating. Check again later.")
+            else:
+                st.session_state["audio_result"] = {
+                    **st.session_state.get("audio_request", {}),
+                    "data": audio_bytes,
+                    "filename": "scenesound_generated.mp3",
+                    "mime": "audio/mpeg",
+                    "source": "generated",
+                    "generation_id": job_id,
+                }
+                st.session_state.pop("stable_audio_generation_id", None)
+                st.session_state.pop("audio_request", None)
+                # Refresh the Generate button's disabled state.
+                st.rerun()
+        except (FileNotFoundError, KeyError):
+            st.error("Add STABILITY_API_KEY to .streamlit/secrets.toml.")
+        except (StableAudioError, ValueError) as error:
+            # Keep both the job ID and the last completed audio on an error.
+            st.error(str(error))
 
-        st.audio(
-            result["data"],
-            format=result["mime"],)
+# Member 4: this player remains visible even when no prompt draft is present.
+if "audio_result" in st.session_state:
+    result = st.session_state["audio_result"]
+    st.subheader("Last completed audio")
 
-        st.download_button(
-            "Download audio",
-            data=result["data"],
-            file_name=result["filename"],
-            mime=result["mime"],)
+    if result.get("source") == "generated":
+        st.caption("Generated with Stable Audio.")
+    else:
+        # A result left over from an older app version may lack metadata.
+        st.caption("Previously saved audio; source details are unavailable.")
 
-    # Member #5/6: retrieve the finished audio, then create a preview with FFmpeg.
+    if "duration" in result:
+        st.caption(f"Requested length: {result['duration']} seconds.")
+
+    if "signature" not in result or "prompt" not in result:
+        st.info("The original request details are unavailable for this saved result.")
+    elif (
+        result["signature"] != signature
+        or result["prompt"] != st.session_state.get("prompt_draft")
+    ):
+        st.info(
+            "This audio belongs to an earlier request. Generate again when "
+            "you are ready to update it."
+        )
+
+    st.audio(result["data"], format=result["mime"])
+    st.download_button(
+        "Download audio", data=result["data"],
+        file_name=result["filename"], mime=result["mime"],
+    )
+
+# Test audio uses a separate state key so it cannot replace generated audio.
+if st.button("Load test audio (no API call)"):
+    audio_path = Path(__file__).resolve().parent / "data" / "test_audio.mp3"
+    try:
+        test_bytes = audio_path.read_bytes()
+        if not test_bytes:
+            raise ValueError("The test MP3 is empty. Please use a playable MP3.")
+        st.session_state["test_audio_result"] = test_bytes
+    except OSError:
+        st.error("Could not read data/test_audio.mp3. Check the file and permissions.")
+    except ValueError as error:
+        st.error(str(error))
+
+if "test_audio_result" in st.session_state:
+    st.subheader("Test audio — not AI-generated")
+    st.audio(st.session_state["test_audio_result"], format="audio/mpeg")
+    st.download_button(
+        "Download test audio", data=st.session_state["test_audio_result"],
+        file_name="scenesound_test.mp3", mime="audio/mpeg",
+    )
+
+# Members 5/6: later add a combined video/audio preview using FFmpeg.
