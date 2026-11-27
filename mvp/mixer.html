@@ -1,0 +1,56 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{color-scheme:light dark}body{font:15px system-ui;margin:0;color:CanvasText}video{width:100%;max-height:300px;background:black}button{padding:8px 18px;cursor:pointer}section{border-bottom:1px solid #8886;padding:9px 0}label,small{margin-right:12px}input{vertical-align:middle}strong{display:block}#msg{margin-left:12px}
+</style>
+<video muted playsinline hidden></video><p><button id="play">Play mix</button> <button id="stop">Stop</button><span id="msg" role="status"></span></p><main></main>
+<script>
+const {rows, video}=/*PAYLOAD*/;
+const ctx=new AudioContext(), master=ctx.createDynamicsCompressor(), v=document.querySelector("video");
+master.connect(ctx.destination);
+if(video){v.src="data:video/mp4;base64,"+video;v.hidden=false;}
+const storeKey="scenesound-mixer-"+rows[0].id;
+let saved={};try{saved=JSON.parse(sessionStorage.getItem(storeKey)||"{}")}catch{}
+let sources=[],ticket=0;
+function levels(){
+ const any=rows.some(r=>r.solo.checked);
+ for(const r of rows){
+  const audible=!r.mute.checked && (!any || r.solo.checked);
+  r.gain.gain.setTargetAtTime(audible?r.volume.value/100:0,ctx.currentTime,0.01);
+  saved[r.id]=[r.volume.value,r.mute.checked,r.solo.checked];
+ }
+ try{sessionStorage.setItem(storeKey,JSON.stringify(saved))}catch{}
+}
+function control(el,label,type){
+ const l=document.createElement("label"),i=document.createElement("input");
+ i.type=type;l.append(label+" ",i);el.append(l);i.oninput=levels;return i;
+}
+for(const r of rows){
+ const el=document.createElement("section"), title=document.createElement("strong");
+ title.textContent=r.name+" · "+r.source;el.append(title);document.querySelector("main").append(el);
+ const [volume,mute,solo]=saved[r.id]||[80,false,false];
+ r.volume=control(el,"Volume","range");r.volume.value=volume;
+ r.mute=control(el,"Mute","checkbox");r.mute.checked=mute;
+ r.solo=control(el,"Solo","checkbox");r.solo.checked=solo;
+ r.gain=ctx.createGain();r.gain.connect(master);
+}
+levels();
+function halt(){ticket++;for(const s of sources){s.onended=null;s.stop();s.disconnect()}sources=[];v.pause();if(video)v.currentTime=0;document.querySelector("#msg").textContent="";}
+document.querySelector("#stop").onclick=halt;
+v.onended=halt;
+document.querySelector("#play").onclick=async()=>{
+ halt();const run=ticket,msg=document.querySelector("#msg");
+ try{
+ await ctx.resume();
+ await Promise.all(rows.map(async r=>{if(!r.buffer)r.buffer=await ctx.decodeAudioData(Uint8Array.from(atob(r.data),c=>c.charCodeAt(0)).buffer)}));
+ if(run!==ticket)return;
+ if(video)await v.play();
+ if(run!==ticket)return;
+ const start=ctx.currentTime; let remaining=rows.length;
+ for(const r of rows){
+  const s=ctx.createBufferSource();s.buffer=r.buffer;s.connect(r.gain);sources.push(s);
+  s.onended=()=>{if(--remaining===0&&!video)msg.textContent="Finished"};s.start(start);
+ }
+ msg.textContent="Playing";
+ }catch(e){if(run===ticket){halt();msg.textContent="Playback failed: "+e.message}}
+};
+</script>
