@@ -11,3 +11,4 @@ outputs/
 tmp/
 .DS_Store
 *.log
+*.pyc
